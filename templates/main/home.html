@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block title %}Главная - Тренажёр памяти{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto text-center">
+        <h1 class="display-4 mb-4">
+            <i class="bi bi-brain"></i> Тренажёр памяти
+        </h1>
+        <p class="lead">Развивайте свою память с помощью увлекательных упражнений!</p>
+        
+        {% if not user.is_authenticated %}
+        <div class="mt-4">
+            <a href="{% url 'register' %}" class="btn btn-primary btn-lg">Начать тренировки</a>
+            <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-lg">Войти</a>
+        </div>
+        {% else %}
+        <div class="mt-4">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Ваш уровень</h5>
+                            <h2 class="text-primary">{{ user.level }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Всего очков</h5>
+                            <h2 class="text-success">{{ user.total_points }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Прогресс</h5>
+                            <div class="progress">
+                                <div class="progress-bar" style="width: {{ progress_percent }}%"></div>
+                            </div>
+                            <small>{{ user.experience }}/{{ user.level|add:100 }} опыта</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <a href="{% url 'tasks_list' %}" class="btn btn-success btn-lg">Начать тренировку</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
