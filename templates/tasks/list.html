@@ -3,8 +3,49 @@
 {% block title %}Задания{% endblock %}
 
 {% block content %}
-<div class="text-center">
-    <h1>Задания</h1>
-    <p class="lead">Раздел заданий скоро появится...</p>
+<h1 class="mb-4">Тренировки памяти</h1>
+
+{% for category_name, tasks in categories.items %}
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">{{ category_name }}</h4>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for item in tasks %}
+            <div class="col-md-6 mb-3">
+                <div class="card h-100 {% if item.completed %}bg-success bg-opacity-10{% elif item.locked %}bg-secondary bg-opacity-10{% endif %}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h5 class="card-title">
+                                {{ item.task.title }}
+                                {% if item.completed %}
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                {% elif item.locked %}
+                                    <i class="bi bi-lock-fill text-secondary"></i>
+                                {% endif %}
+                            </h5>
+                            <span class="badge bg-info">{{ item.task.get_difficulty_display }}</span>
+                        </div>
+                        <p class="card-text">{{ item.task.description }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-warning">
+                                <i class="bi bi-star-fill"></i> {{ item.task.get_points }} очков
+                            </span>
+                            {% if not item.completed and not item.locked %}
+                            <a href="{% url 'task_detail' item.task.id %}" class="btn btn-primary">Начать</a>
+                            {% elif item.locked %}
+                            <button class="btn btn-secondary" disabled>Доступно с {{ item.task.difficulty }} уровня</button>
+                            {% else %}
+                            <button class="btn btn-success" disabled>Выполнено</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 </div>
+{% endfor %}
 {% endblock %}

@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ task.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .game-container {
+        min-height: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .result-message {
+        font-size: 1.2rem;
+        margin-top: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">{{ task.title }}</h3>
+            </div>
+            <div class="card-body">
+                <p class="lead">{{ task.description }}</p>
+                <p class="text-muted">Сложность: {{ task.get_difficulty_display }} | Очков: {{ task.get_points }}</p>
+                <hr>
+                
+                <div id="game-container" class="game-container">
+                    <!-- Игра будет загружена сюда -->
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <p>Загрузка задания...</p>
+                    </div>
+                </div>
+                
+                <form id="game-form" method="post" style="display: none;">
+                    {% csrf_token %}
+                    <input type="hidden" name="score" id="score-input">
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/memory-games.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const taskData = {{ task.task_data|safe }};
+        const taskType = '{{ task.task_type }}';
+        
+        function completeGame(isCorrect) {
+            const form = document.getElementById('game-form');
+            const scoreInput = document.getElementById('score-input');
+            
+            if (isCorrect) {
+                // Полные очки за правильный ответ
+                scoreInput.value = {{ task.get_points }};
+                showResult(true, 'Правильно! Вы получаете {{ task.get_points }} очков!');
+            } else {
+                // Половина очков за неправильный
+                const halfPoints = Math.floor({{ task.get_points }} / 2);
+                scoreInput.value = halfPoints;
+                showResult(false, `Неправильно. Вы получаете ${halfPoints} очков за попытку.`);
+            }
+            
+            // Отправляем форму через 2 секунды
+            setTimeout(() => {
+                form.submit();
+            }, 2000);
+        }
+        
+        function showResult(isCorrect, message) {
+            const container = document.getElementById('game-container');
+            const alertClass = isCorrect ? 'alert-success' : 'alert-danger';
+            container.innerHTML = `
+                <div class="alert ${alertClass} text-center">
+                    <h4>${isCorrect ? 'Поздравляем!' : 'Попробуйте еще раз!'}</h4>
+                    <p>${message}</p>
+                    <div class="spinner-border text-${isCorrect ? 'success' : 'danger'}" role="status">
+                        <span class="visually-hidden">Перенаправление...</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Запускаем соответствующую игру
+        let game;
+        if (taskType === 'visual') {
+            game = new ColorMemoryGame(taskData.colors, completeGame);
+        } else if (taskType === 'number') {
+            game = new NumberMemoryGame(taskData.numbers, completeGame);
+        } else if (taskType === 'text') {
+            if (taskData.words) {
+                game = new TextMemoryGame(taskData.words, completeGame);
+            } else if (taskData.text) {
+                // Для текстовых заданий используем упрощенную версию
+                const words = taskData.text.split(' ');
+                game = new TextMemoryGame(words.slice(0, 5), completeGame);
+            }
+        } else if (taskType === 'pattern') {
+            game = new PatternMemoryGame(taskData.grid_size, taskData.pattern, completeGame);
+        }
+        
+        window.currentGame = game;
+    });
+</script>
+{% endblock %}
