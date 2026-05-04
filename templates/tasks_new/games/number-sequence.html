@@ -1,0 +1,57 @@
+{% extends 'tasks_new/game_base.html' %}
+
+{% block game_content %}
+<div class="text-center">
+    <div id="memory-phase">
+        <h4>Запомните последовательность чисел!</h4>
+        <div id="numbers-display" class="my-4">
+            {% for num in task_data.numbers %}
+            <span class="badge bg-primary fs-1 mx-2">{{ num }}</span>
+            {% endfor %}
+        </div>
+        <p class="text-muted">У вас есть {{ max_time }} секунд...</p>
+        <div id="timer" class="display-4">{{ max_time }}</div>
+    </div>
+    
+    <div id="test-phase" style="display: none;">
+        <h4>Введите последовательность чисел</h4>
+        <input type="text" id="user-sequence" class="form-control form-control-lg w-75 mx-auto mt-4" 
+               placeholder="Пример: 5, 2, 8, 3, 9">
+        <button type="button" class="btn btn-primary mt-3" id="check-sequence">Проверить</button>
+    </div>
+</div>
+
+<script>
+    const correctNumbers = {{ task_data.numbers|safe }};
+    const maxTime = {{ max_time }};
+    let timeLeft = maxTime;
+    let timerInterval;
+    
+    function startTimer() {
+        const timerDisplay = document.getElementById('timer');
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerDisplay.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                showTestPhase();
+            }
+        }, 1000);
+    }
+    
+    function showTestPhase() {
+        clearInterval(timerInterval);
+        document.getElementById('memory-phase').style.display = 'none';
+        document.getElementById('test-phase').style.display = 'block';
+    }
+    
+    document.getElementById('check-sequence').addEventListener('click', () => {
+        const userInput = document.getElementById('user-sequence').value;
+        const answerInput = document.getElementById('answer-input');
+        answerInput.value = userInput;
+        document.getElementById('submit-btn').click();
+    });
+    
+    startTimer();
+</script>
+{% endblock %}

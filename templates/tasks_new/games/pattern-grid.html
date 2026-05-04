@@ -1,0 +1,106 @@
+{% extends 'tasks_new/game_base.html' %}
+
+{% block game_content %}
+<div class="pattern-game">
+    <div id="memory-phase" class="text-center">
+        <h4>Запомните расположение зелёных клеток!</h4>
+        <div id="pattern-display" class="my-4" style="display: inline-block;"></div>
+        <p class="text-muted">У вас есть {{ max_time }} секунд...</p>
+        <div id="timer" class="display-4">{{ max_time }}</div>
+    </div>
+    
+    <div id="test-phase" style="display: none;">
+        <h4>Повторите расположение клеток</h4>
+        <div id="pattern-input" class="my-4" style="display: inline-block;"></div>
+        <button type="button" class="btn btn-primary" id="check-pattern">Готово</button>
+    </div>
+</div>
+
+<script>
+    const gridSize = {{ task_data.grid_size }};
+    const correctPattern = {{ task_data.pattern|safe }};
+    const maxTime = {{ max_time }};
+    
+    let selectedCells = [];
+    let timerInterval;
+    let timeLeft = maxTime;
+    
+    function createGrid(containerId, isInteractive = false) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        container.style.display = 'grid';
+        container.style.gridTemplateColumns = `repeat(${gridSize}, 80px)`;
+        container.style.gap = '10px';
+        container.style.justifyContent = 'center';
+        
+        for (let i = 0; i < gridSize * gridSize; i++) {
+            const cell = document.createElement('div');
+            cell.style.width = '80px';
+            cell.style.height = '80px';
+            cell.style.border = '2px solid #ddd';
+            cell.style.borderRadius = '5px';
+            cell.style.cursor = isInteractive ? 'pointer' : 'default';
+            cell.style.backgroundColor = '#f0f0f0';
+            cell.style.transition = 'all 0.3s';
+            cell.dataset.index = i;
+            
+            if (isInteractive) {
+                cell.addEventListener('click', () => toggleCell(cell, i));
+            }
+            
+            container.appendChild(cell);
+        }
+    }
+    
+    function displayPattern() {
+        const container = document.getElementById('pattern-display');
+        const cells = container.children;
+        correctPattern.forEach(idx => {
+            if (cells[idx]) cells[idx].style.backgroundColor = '#28a745';
+        });
+    }
+    
+    function toggleCell(cell, index) {
+        if (selectedCells.includes(index)) {
+            selectedCells = selectedCells.filter(i => i !== index);
+            cell.style.backgroundColor = '#f0f0f0';
+        } else {
+            selectedCells.push(index);
+            cell.style.backgroundColor = '#28a745';
+        }
+    }
+    
+    function startTimer() {
+        const timerDisplay = document.getElementById('timer');
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerDisplay.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                showTestPhase();
+            }
+        }, 1000);
+    }
+    
+    function showTestPhase() {
+        clearInterval(timerInterval);
+        document.getElementById('memory-phase').style.display = 'none';
+        document.getElementById('test-phase').style.display = 'block';
+        createGrid('pattern-input', true);
+    }
+    
+    document.getElementById('check-pattern').addEventListener('click', () => {
+        const isCorrect = selectedCells.length === correctPattern.length && 
+                         selectedCells.sort((a,b) => a-b).every((val, i) => val === correctPattern[i]);
+        
+        const answerInput = document.getElementById('answer-input');
+        answerInput.value = JSON.stringify(selectedCells);
+        document.getElementById('submit-btn').click();
+    });
+    
+    // Инициализация
+    createGrid('pattern-display', false);
+    displayPattern();
+    startTimer();
+</script>
+{% endblock %}

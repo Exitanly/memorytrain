@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ exercise.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">{{ exercise.name }}</h3>
+            </div>
+            <div class="card-body">
+                <p class="lead">{{ exercise.description }}</p>
+                <div class="alert alert-info">
+                    <i class="bi bi-lightbulb"></i> {{ exercise.instruction }}
+                </div>
+                <p class="text-muted">
+                    Сложность: 
+                    {% if difficulty == 1 %}
+                        <span class="badge bg-success">Лёгкая</span>
+                    {% elif difficulty == 2 %}
+                        <span class="badge bg-warning">Средняя</span>
+                    {% else %}
+                        <span class="badge bg-danger">Сложная</span>
+                    {% endif %}
+                </p>
+                <hr>
+                
+                <div id="game-container" class="text-center">
+                    <!-- Контент игры будет вставлен сюда -->
+                    {% block game_content %}
+                    <div class="alert alert-warning">
+                        ⚠️ Шаблон для этого упражнения ещё не создан.
+                        <pre class="mt-3 text-start">Данные задания: {{ task_data|safe }}</pre>
+                    </div>
+                    {% endblock %}
+                </div>
+                
+                <form method="post" action="{% url 'exercise_check' exercise.slug %}" id="game-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="answer" id="answer-input">
+                    <button type="submit" class="btn btn-success btn-lg w-100 mt-3" id="submit-btn">
+                        Проверить ответ
+                    </button>
+                </form>
+                
+                <div class="mt-3">
+                    <a href="{% url 'exercise_list' %}" class="btn btn-secondary w-100">← К списку тренировок</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Базовый JavaScript для отправки ответа
+    document.getElementById('game-form').addEventListener('submit', function(e) {
+        const answerInput = document.getElementById('answer-input');
+        if (!answerInput.value) {
+            e.preventDefault();
+            alert('Пожалуйста, дайте ответ перед проверкой');
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,214 @@
+{% extends 'tasks_new/game_base.html' %}
+
+{% block game_content %}
+<style>
+    .card-memory {
+        width: 100px;
+        height: 100px;
+        perspective: 1000px;
+        cursor: pointer;
+    }
+    .card-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+        border-radius: 10px;
+    }
+    .card-memory.flipped .card-inner {
+        transform: rotateY(180deg);
+    }
+    .card-memory.matched .card-inner {
+        transform: rotateY(180deg);
+        opacity: 0.6;
+        cursor: default;
+    }
+    .card-front, .card-back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+    }
+    .card-front {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        transform: rotateY(180deg);
+    }
+    .card-back {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        transform: rotateY(0deg);
+    }
+    .cards-grid {
+        display: grid;
+        gap: 10px;
+        justify-content: center;
+        margin: 20px 0;
+    }
+</style>
+
+<div class="text-center">
+    <h4>Найдите все пары одинаковых карточек!</h4>
+    <p class="text-muted">Переворачивайте карточки по две и находите совпадающие пары.</p>
+    
+    <div id="game-stats" class="alert alert-info">
+        <strong>Ходов: <span id="moves-count">0</span></strong>
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        <strong>Найдено пар: <span id="pairs-found">0</span> / {{ task_data.pairs_count }}</strong>
+    </div>
+    
+    <div id="cards-container" class="cards-grid" style="grid-template-columns: repeat({{ task_data.grid_cols }}, 100px);">
+        <!-- Карточки будут созданы JS -->
+    </div>
+    
+    <div id="game-complete" style="display: none;" class="alert alert-success mt-3">
+        <h4>🎉 Поздравляем! 🎉</h4>
+        <p>Вы нашли все пары!</p>
+        <button type="button" class="btn btn-success" id="complete-game">Продолжить</button>
+    </div>
+</div>
+
+<script>
+    const cardsData = {{ task_data.cards|safe }};
+    const pairsCount = {{ task_data.pairs_count }};
+    
+    let cards = [];
+    let flippedCards = [];
+    let matchedPairs = new Set();
+    let moves = 0;
+    let lockBoard = false;
+    
+    function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+    
+    function initGame() {
+        // Создаём массив карточек
+        cards = cardsData.map((icon, index) => ({
+            id: index,
+            icon: icon,
+            flipped: false,
+            matched: false
+        }));
+        
+        renderCards();
+        updateStats();
+    }
+    
+    function renderCards() {
+        const container = document.getElementById('cards-container');
+        container.innerHTML = '';
+        
+        cards.forEach(card => {
+            const cardElement = document.createElement('div');
+            cardElement.className = 'card-memory';
+            if (card.flipped || card.matched) cardElement.classList.add('flipped');
+            if (card.matched) cardElement.classList.add('matched');
+            cardElement.dataset.id = card.id;
+            
+            cardElement.innerHTML = `
+                <div class="card-inner">
+                    <div class="card-back">?</div>
+                    <div class="card-front">${card.icon}</div>
+                </div>
+            `;
+            
+            if (!card.matched) {
+                cardElement.addEventListener('click', () => onCardClick(card.id));
+            }
+            
+            container.appendChild(cardElement);
+        });
+    }
+    
+    function onCardClick(cardId) {
+        if (lockBoard) return;
+        
+        const card = cards[cardId];
+        if (card.flipped || card.matched) return;
+        
+        card.flipped = true;
+        renderCards();
+        
+        flippedCards.push(cardId);
+        
+        if (flippedCards.length === 2) {
+            moves++;
+            updateStats();
+            lockBoard = true;
+            checkMatch();
+        }
+    }
+    
+    function checkMatch() {
+        const card1 = cards[flippedCards[0]];
+        const card2 = cards[flippedCards[1]];
+        
+        if (card1.icon === card2.icon) {
+            // Совпадение
+            card1.matched = true;
+            card2.matched = true;
+            card1.flipped = false;
+            card2.flipped = false;
+            matchedPairs.add(card1.icon);
+            
+            flippedCards = [];
+            lockBoard = false;
+            renderCards();
+            updateStats();
+            
+            // Проверяем победу
+            if (matchedPairs.size === pairsCount) {
+                showComplete();
+            }
+        } else {
+            // Не совпали - переворачиваем обратно через секунду
+            setTimeout(() => {
+                card1.flipped = false;
+                card2.flipped = false;
+                flippedCards = [];
+                lockBoard = false;
+                renderCards();
+            }, 1000);
+        }
+    }
+    
+    function updateStats() {
+        document.getElementById('moves-count').textContent = moves;
+        document.getElementById('pairs-found').textContent = matchedPairs.size;
+    }
+    
+    function showComplete() {
+    document.getElementById('game-complete').style.display = 'block';
+    document.getElementById('cards-container').style.opacity = '0.7';
+}
+
+document.getElementById('complete-game').addEventListener('click', () => {
+    // Собираем все попытки пользователя (историю ходов)
+    // Поскольку мы не сохраняли историю, отправим финальный результат
+    const gameData = {
+        matched_pairs: matchedPairs.size,
+        total_pairs: pairsCount,
+        moves: moves
+    };
+    
+    console.log('Отправка данных:', gameData);
+    
+    const answerInput = document.getElementById('answer-input');
+    answerInput.value = JSON.stringify(gameData);
+    document.getElementById('submit-btn').click();
+});
+    
+    // Запускаем игру
+    initGame();
+</script>
+{% endblock %}

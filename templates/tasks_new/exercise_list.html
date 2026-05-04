@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Тренировки{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Тренировки памяти</h1>
+
+{% for cat_key, category in categories.items %}
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h3 class="mb-0">{{ category.name }}</h3>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for exercise in category.exercises %}
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi {{ exercise.icon }} fs-1"></i>
+                        <h5 class="card-title mt-2">{{ exercise.name }}</h5>
+                        <p class="card-text small">{{ exercise.description|truncatewords:15 }}</p>
+                        <a href="{% url 'exercise_play' exercise.slug %}" class="btn btn-primary">Начать</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
