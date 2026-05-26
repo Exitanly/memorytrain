@@ -1,1 +1,238 @@
-"{% extends 'tasks_new/game_base.html' %} {% block game_content %}<div class='alert alert-warning'>��ࠦ����� � ࠧࠡ�⪥</div>{% endblock %}" 
+{% extends 'tasks_new/game_base.html' %}
+
+{% block game_content %}
+<style>
+    .position-grid {
+        display: grid;
+        gap: 10px;
+        justify-content: center;
+        margin: 20px 0;
+    }
+    .grid-cell {
+        width: 80px;
+        height: 80px;
+        background-color: #f0f0f0;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .grid-cell:hover {
+        background-color: #e0e0e0;
+        transform: scale(1.02);
+    }
+    .grid-cell.selected {
+        background-color: #28a745;
+        color: white;
+    }
+    .number-highlight {
+        background-color: #ff9800;
+        color: white;
+        animation: pulse 0.5s ease;
+    }
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+</style>
+
+<div class="text-center">
+    <div id="memory-phase">
+        <h4>Запомните расположение чисел!</h4>
+        <p class="text-muted">Числа будут появляться в разных клетках. Запомните их расположение и порядок.</p>
+        <div id="grid-memory" class="position-grid" style="grid-template-columns: repeat({{ task_data.grid_size }}, 80px);">
+        </div>
+    </div>
+    
+    <div id="test-phase" style="display: none;">
+        <h4>Повторите порядок чисел</h4>
+        <p class="text-muted">Нажимайте на клетки в том порядке, в котором появлялись числа</p>
+        <div id="grid-test" class="position-grid" style="grid-template-columns: repeat({{ task_data.grid_size }}, 80px);">
+        </div>
+        <div class="mt-3">
+            <p>Порядок: <strong><span id="click-order">0</span> / {{ task_data.numbers_count }}</strong></p>
+            <a href="{% url 'exercise_play' exercise.slug %}" class="btn btn-warning">Новое задание</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const gridSize = {{ task_data.grid_size }};
+    const numbersCount = {{ task_data.numbers_count }};
+    const sequence = {{ task_data.sequence|safe }};
+    
+    let currentNumber = 1;
+    let userClicks = [];
+    let isShowing = true;
+    let gameActive = true;
+    
+    function createGrid(containerId, isMemory = false) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        
+        for (let i = 0; i < gridSize * gridSize; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'grid-cell';
+            cell.dataset.index = i;
+            
+            if (!isMemory) {
+                cell.addEventListener('click', () => onCellClick(i));
+            }
+            
+            container.appendChild(cell);
+        }
+    }
+    
+    function clearErrorMessages() {
+        const errorDiv = document.getElementById('error-message');
+        const overlay = document.getElementById('error-overlay');
+        if (errorDiv) errorDiv.remove();
+        if (overlay) overlay.remove();
+    }
+    
+    function showNumbers() {
+        clearErrorMessages();
+        
+        const cells = document.querySelectorAll('#grid-memory .grid-cell');
+        if (!cells.length) return;
+        
+        const numbers = Object.keys(sequence).map(Number);
+        let idx = 0;
+        
+        function showNextNumber() {
+            if (idx >= numbers.length) {
+                setTimeout(() => {
+                    showTestPhase();
+                }, 1000);
+                return;
+            }
+            
+            const num = numbers[idx];
+            const position = sequence[num];
+            if (!cells[position]) return;
+            
+            cells[position].textContent = num;
+            cells[position].classList.add('number-highlight');
+            
+            setTimeout(() => {
+                if (cells[position]) {
+                    cells[position].textContent = '';
+                    cells[position].classList.remove('number-highlight');
+                }
+                idx++;
+                showNextNumber();
+            }, 1000);
+        }
+        
+        showNextNumber();
+    }
+    
+    function showTestPhase() {
+        isShowing = false;
+        gameActive = true;
+        const memoryPhase = document.getElementById('memory-phase');
+        const testPhase = document.getElementById('test-phase');
+        if (memoryPhase) memoryPhase.style.display = 'none';
+        if (testPhase) testPhase.style.display = 'block';
+        createGrid('grid-test', false);
+    }
+    
+    function showErrorMessage(wrongPosition, correctPosition) {
+        let errorDiv = document.getElementById('error-message');
+        if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.id = 'error-message';
+            errorDiv.className = 'alert alert-danger mt-3';
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.top = '50%';
+            errorDiv.style.left = '50%';
+            errorDiv.style.transform = 'translate(-50%, -50%)';
+            errorDiv.style.zIndex = '1000';
+            errorDiv.style.minWidth = '350px';
+            errorDiv.style.textAlign = 'center';
+            document.body.appendChild(errorDiv);
+        }
+        
+        errorDiv.innerHTML = `
+            <h5>❌ Неправильно!</h5>
+            <p>Вы нажали на неправильную клетку.</p>
+            <hr>
+            <button type="button" class="btn btn-primary mt-2" onclick="location.reload()">Попробовать еще раз</button>
+            <a href="{% url 'exercise_list' %}" class="btn btn-secondary mt-2 ms-2">К списку тренировок</a>
+        `;
+        
+        let overlay = document.getElementById('error-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'error-overlay';
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100%';
+            overlay.style.height = '100%';
+            overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+            overlay.style.zIndex = '999';
+            document.body.appendChild(overlay);
+        }
+    }
+    
+    function completeGame(isSuccess) {
+        if (!gameActive) return;
+        gameActive = false;
+        isShowing = true;
+        
+        if (isSuccess) {
+            const answerInput = document.getElementById('answer-input');
+            if (answerInput) {
+                answerInput.value = JSON.stringify(userClicks);
+            }
+            const submitBtn = document.getElementById('submit-btn');
+            if (submitBtn) {
+                submitBtn.click();
+            }
+        }
+    }
+    
+    function onCellClick(position) {
+        if (isShowing || !gameActive) return;
+        
+        const cells = document.querySelectorAll('#grid-test .grid-cell');
+        if (!cells[position]) return;
+        const cell = cells[position];
+        
+        if (cell.classList.contains('selected')) return;
+        
+        const expectedPosition = sequence[currentNumber];
+        
+        if (position === expectedPosition) {
+            cell.classList.add('selected');
+            userClicks.push(position);
+            currentNumber++;
+            
+            const clickOrderSpan = document.getElementById('click-order');
+            if (clickOrderSpan) {
+                clickOrderSpan.textContent = userClicks.length;
+            }
+            
+            if (userClicks.length === numbersCount) {
+                completeGame(true);
+            }
+        } else {
+            gameActive = false;
+            cell.style.backgroundColor = '#dc3545';
+            showErrorMessage(position, expectedPosition);
+        }
+    }
+    
+    // Инициализация
+    createGrid('grid-memory', true);
+    showNumbers();
+</script>
+{% endblock %}

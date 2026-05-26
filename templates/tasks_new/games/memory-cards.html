@@ -63,13 +63,12 @@
     </div>
     
     <div id="cards-container" class="cards-grid" style="grid-template-columns: repeat({{ task_data.grid_cols }}, 100px);">
-        <!-- Карточки будут созданы JS -->
     </div>
     
     <div id="game-complete" style="display: none;" class="alert alert-success mt-3">
         <h4>🎉 Поздравляем! 🎉</h4>
         <p>Вы нашли все пары!</p>
-        <button type="button" class="btn btn-success" id="complete-game">Продолжить</button>
+        <button type="button" class="btn btn-success" id="complete-game">Завершить игру</button>
     </div>
 </div>
 
@@ -82,17 +81,9 @@
     let matchedPairs = new Set();
     let moves = 0;
     let lockBoard = false;
-    
-    function shuffleArray(arr) {
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        return arr;
-    }
+    let gameCompleted = false;
     
     function initGame() {
-        // Создаём массив карточек
         cards = cardsData.map((icon, index) => ({
             id: index,
             icon: icon,
@@ -102,10 +93,17 @@
         
         renderCards();
         updateStats();
+        
+        const completeBtn = document.getElementById('complete-game');
+        if (completeBtn) {
+            completeBtn.addEventListener('click', completeGame);
+        }
     }
     
     function renderCards() {
         const container = document.getElementById('cards-container');
+        if (!container) return;
+        
         container.innerHTML = '';
         
         cards.forEach(card => {
@@ -122,7 +120,7 @@
                 </div>
             `;
             
-            if (!card.matched) {
+            if (!card.matched && !gameCompleted) {
                 cardElement.addEventListener('click', () => onCardClick(card.id));
             }
             
@@ -131,7 +129,7 @@
     }
     
     function onCardClick(cardId) {
-        if (lockBoard) return;
+        if (lockBoard || gameCompleted) return;
         
         const card = cards[cardId];
         if (card.flipped || card.matched) return;
@@ -154,7 +152,6 @@
         const card2 = cards[flippedCards[1]];
         
         if (card1.icon === card2.icon) {
-            // Совпадение
             card1.matched = true;
             card2.matched = true;
             card1.flipped = false;
@@ -166,12 +163,10 @@
             renderCards();
             updateStats();
             
-            // Проверяем победу
             if (matchedPairs.size === pairsCount) {
                 showComplete();
             }
         } else {
-            // Не совпали - переворачиваем обратно через секунду
             setTimeout(() => {
                 card1.flipped = false;
                 card2.flipped = false;
@@ -183,32 +178,42 @@
     }
     
     function updateStats() {
-        document.getElementById('moves-count').textContent = moves;
-        document.getElementById('pairs-found').textContent = matchedPairs.size;
+        const movesSpan = document.getElementById('moves-count');
+        const pairsSpan = document.getElementById('pairs-found');
+        if (movesSpan) movesSpan.textContent = moves;
+        if (pairsSpan) pairsSpan.textContent = matchedPairs.size;
     }
     
     function showComplete() {
-    document.getElementById('game-complete').style.display = 'block';
-    document.getElementById('cards-container').style.opacity = '0.7';
-}
-
-document.getElementById('complete-game').addEventListener('click', () => {
-    // Собираем все попытки пользователя (историю ходов)
-    // Поскольку мы не сохраняли историю, отправим финальный результат
-    const gameData = {
-        matched_pairs: matchedPairs.size,
-        total_pairs: pairsCount,
-        moves: moves
-    };
+        gameCompleted = true;
+        const completeDiv = document.getElementById('game-complete');
+        if (completeDiv) completeDiv.style.display = 'block';
+        const container = document.getElementById('cards-container');
+        if (container) container.style.opacity = '0.7';
+    }
     
-    console.log('Отправка данных:', gameData);
+    function completeGame() {
+        if (!gameCompleted) {
+            alert('Сначала найдите все пары карточек!');
+            return;
+        }
+        
+        const gameData = {
+            matched_pairs: matchedPairs.size,
+            total_pairs: pairsCount,
+            moves: moves,
+            completed: true
+        };
+        
+        const answerInput = document.getElementById('answer-input');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        if (answerInput && submitBtn) {
+            answerInput.value = JSON.stringify(gameData);
+            submitBtn.click();
+        }
+    }
     
-    const answerInput = document.getElementById('answer-input');
-    answerInput.value = JSON.stringify(gameData);
-    document.getElementById('submit-btn').click();
-});
-    
-    // Запускаем игру
     initGame();
 </script>
 {% endblock %}

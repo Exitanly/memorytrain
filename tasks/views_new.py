@@ -69,44 +69,58 @@ def exercise_play(request, slug):
         get_template(template_name)
         return render(request, template_name, context)
     except TemplateDoesNotExist:
-        # Если нет, используем общий шаблон
         return render(request, 'tasks_new/game_base.html', context)
 
 
 @login_required
 def exercise_check(request, slug):
     """Проверка ответа"""
+    print(f"\n=== DEBUG: Проверка упражнения {slug} ===")
+    
     if request.method != 'POST':
+        print("DEBUG: Не POST запрос")
         return redirect('exercise_list')
     
     exercise_type = get_object_or_404(ExerciseType, slug=slug)
     
-    # Получаем данные из сессии
     session_data = request.session.get('current_exercise')
+    print(f"DEBUG: session_data = {session_data}")
+    
     if not session_data or session_data.get('slug') != slug:
         messages.error(request, 'Сессия истекла. Начните заново.')
         return redirect('exercise_play', slug=slug)
     
-    # Получаем ответ пользователя
     user_answer = request.POST.get('answer')
+    print(f"DEBUG: Получен ответ (raw): {user_answer}")
+    print(f"DEBUG: Тип ответа: {type(user_answer)}")
+    
     if not user_answer:
         messages.error(request, 'Пожалуйста, дайте ответ')
         return redirect('exercise_play', slug=slug)
     
     # Парсим ответ
+    parsed_answer = user_answer
     try:
-        user_answer = json.loads(user_answer)
-    except:
-        pass
+        if user_answer.startswith('{'):
+            parsed_answer = json.loads(user_answer)
+            print(f"DEBUG: Распарсили в JSON: {parsed_answer}")
+    except Exception as e:
+        print(f"DEBUG: Ошибка парсинга JSON: {e}")
     
-    # Получаем генератор и проверяем ответ
+    # Получаем генератор
     generator_class = GENERATORS.get(session_data['generator_class'])
+    print(f"DEBUG: generator_class = {generator_class}")
+    
     generator = generator_class(session_data['difficulty'])
     
-    is_correct, message = generator.check_answer(user_answer, session_data['check_data'])
+    # Проверяем ответ
+    is_correct, message = generator.check_answer(parsed_answer, session_data['check_data'])
+    print(f"DEBUG: is_correct = {is_correct}")
+    print(f"DEBUG: message = {message}")
     
     # Рассчитываем очки
     score = generator.calculate_score(is_correct, 10, 1) if is_correct else 0
+    print(f"DEBUG: score = {score}")
     
     # Сохраняем сессию
     ExerciseSession.objects.create(
@@ -118,10 +132,11 @@ def exercise_check(request, slug):
             'difficulty': session_data['difficulty'],
             'is_correct': is_correct,
             'score': score,
+            'user_answer': str(user_answer),
         }
     )
     
-    # Начисляем опыт пользователю
+    # Начисляем опыт
     if score > 0:
         level_up = request.user.add_experience(score)
         request.user.save()
@@ -133,6 +148,9 @@ def exercise_check(request, slug):
         messages.warning(request, message)
     
     # Очищаем сессию
-    del request.session['current_exercise']
+    if 'current_exercise' in request.session:
+        del request.session['current_exercise']
+    
+    print("=== DEBUG: Конец проверки ===\n")
     
     return redirect('exercise_play', slug=slug)
