@@ -1,24 +1,58 @@
 {% extends 'tasks_new/game_base.html' %}
 
 {% block game_content %}
-<div class="pattern-game">
-    <div id="memory-phase" class="text-center">
+<style>
+    .grid-container {
+        display: inline-block;
+        margin: 20px auto;
+    }
+    .grid-cell {
+        width: 80px;
+        height: 80px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+        background-color: #f0f0f0;
+    }
+    .grid-cell:hover {
+        transform: scale(1.02);
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    .grid-cell.active {
+        background-color: #28a745;
+    }
+    .timer {
+        font-size: 3rem;
+        font-weight: bold;
+        color: #ff9800;
+        margin: 20px 0;
+    }
+</style>
+
+<div class="text-center">
+    <div id="memory-phase">
         <h4>Запомните расположение зелёных клеток!</h4>
-        <div id="pattern-display" class="my-4" style="display: inline-block;"></div>
+        <div id="pattern-display" class="grid-container"></div>
         <p class="text-muted">У вас есть {{ max_time }} секунд...</p>
-        <div id="timer" class="display-4">{{ max_time }}</div>
+        <div id="timer" class="timer">{{ max_time }}</div>
     </div>
     
     <div id="test-phase" style="display: none;">
         <h4>Повторите расположение клеток</h4>
-        <div id="pattern-input" class="my-4" style="display: inline-block;"></div>
-        <button type="button" class="btn btn-primary" id="check-pattern">Готово</button>
+        <div id="pattern-input" class="grid-container"></div>
+        <div class="mt-3">
+            <p>Выбрано: <strong><span id="selected-count">0</span> / {{ task_data.cells_count }}</strong></p>
+            <button type="button" class="btn btn-primary" id="check-pattern">Проверить</button>
+            <a href="{% url 'exercise_play' exercise.slug %}" class="btn btn-warning ms-2">Начать заново</a>
+        </div>
     </div>
 </div>
 
 <script>
     const gridSize = {{ task_data.grid_size }};
     const correctPattern = {{ task_data.pattern|safe }};
+    const cellsCount = {{ task_data.cells_count }};
     const maxTime = {{ max_time }};
     
     let selectedCells = [];
@@ -27,6 +61,7 @@
     
     function createGrid(containerId, isInteractive = false) {
         const container = document.getElementById(containerId);
+        if (!container) return;
         container.innerHTML = '';
         container.style.display = 'grid';
         container.style.gridTemplateColumns = `repeat(${gridSize}, 80px)`;
@@ -35,13 +70,7 @@
         
         for (let i = 0; i < gridSize * gridSize; i++) {
             const cell = document.createElement('div');
-            cell.style.width = '80px';
-            cell.style.height = '80px';
-            cell.style.border = '2px solid #ddd';
-            cell.style.borderRadius = '5px';
-            cell.style.cursor = isInteractive ? 'pointer' : 'default';
-            cell.style.backgroundColor = '#f0f0f0';
-            cell.style.transition = 'all 0.3s';
+            cell.className = 'grid-cell';
             cell.dataset.index = i;
             
             if (isInteractive) {
@@ -54,9 +83,13 @@
     
     function displayPattern() {
         const container = document.getElementById('pattern-display');
+        if (!container) return;
         const cells = container.children;
         correctPattern.forEach(idx => {
-            if (cells[idx]) cells[idx].style.backgroundColor = '#28a745';
+            if (cells[idx]) {
+                cells[idx].style.backgroundColor = '#28a745';
+                cells[idx].classList.add('active');
+            }
         });
     }
     
@@ -64,14 +97,28 @@
         if (selectedCells.includes(index)) {
             selectedCells = selectedCells.filter(i => i !== index);
             cell.style.backgroundColor = '#f0f0f0';
+            cell.classList.remove('active');
         } else {
-            selectedCells.push(index);
-            cell.style.backgroundColor = '#28a745';
+            if (selectedCells.length < cellsCount) {
+                selectedCells.push(index);
+                cell.style.backgroundColor = '#28a745';
+                cell.classList.add('active');
+            } else {
+                alert(`Можно выбрать только ${cellsCount} клеток!`);
+            }
+        }
+        
+        // Обновляем счётчик
+        const countDisplay = document.getElementById('selected-count');
+        if (countDisplay) {
+            countDisplay.textContent = selectedCells.length;
         }
     }
     
     function startTimer() {
         const timerDisplay = document.getElementById('timer');
+        if (!timerDisplay) return;
+        
         timerInterval = setInterval(() => {
             timeLeft--;
             timerDisplay.textContent = timeLeft;
@@ -89,14 +136,41 @@
         createGrid('pattern-input', true);
     }
     
-    document.getElementById('check-pattern').addEventListener('click', () => {
-        const isCorrect = selectedCells.length === correctPattern.length && 
-                         selectedCells.sort((a,b) => a-b).every((val, i) => val === correctPattern[i]);
-        
-        const answerInput = document.getElementById('answer-input');
-        answerInput.value = JSON.stringify(selectedCells);
-        document.getElementById('submit-btn').click();
-    });
+    // Кнопка проверки
+    const checkBtn = document.getElementById('check-pattern');
+    if (checkBtn) {
+        checkBtn.addEventListener('click', () => {
+            if (selectedCells.length !== cellsCount) {
+                alert(`Вы выбрали ${selectedCells.length} клеток, а нужно ${cellsCount}`);
+                return;
+            }
+            
+            const sortedSelected = [...selectedCells].sort((a, b) => a - b);
+            const sortedCorrect = [...correctPattern].sort((a, b) => a - b);
+            
+            let isMatch = true;
+            for (let i = 0; i < sortedSelected.length; i++) {
+                if (sortedSelected[i] !== sortedCorrect[i]) {
+                    isMatch = false;
+                    break;
+                }
+            }
+            
+            if (!isMatch) {
+                alert('Неправильно! Попробуйте ещё раз.');
+                return;
+            }
+            
+            // Отправляем результат
+            const answerInput = document.getElementById('answer-input');
+            const submitBtn = document.getElementById('submit-btn');
+            
+            if (answerInput && submitBtn) {
+                answerInput.value = JSON.stringify(selectedCells);
+                submitBtn.click();
+            }
+        });
+    }
     
     // Инициализация
     createGrid('pattern-display', false);

@@ -1,1 +1,140 @@
-"{% extends 'tasks_new/game_base.html' %} {% block game_content %}<div class='alert alert-warning'>��ࠦ����� � ࠧࠡ�⪥</div>{% endblock %}" 
+{% extends 'tasks_new/game_base.html' %}
+
+{% block game_content %}
+<style>
+    .word-card {
+        display: inline-block;
+        padding: 12px 20px;
+        margin: 8px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s;
+        user-select: none;
+    }
+    .word-card:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    .word-card.selected {
+        background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+        box-shadow: 0 0 10px rgba(40,167,69,0.5);
+    }
+    .words-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin: 20px 0;
+    }
+    .memory-word {
+        display: inline-block;
+        padding: 10px 20px;
+        margin: 5px;
+        background-color: #ff9800;
+        color: white;
+        border-radius: 20px;
+        font-size: 1.2rem;
+        animation: fadeIn 0.5s ease;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.8); }
+        to { opacity: 1; transform: scale(1); }
+    }
+</style>
+
+<div class="text-center">
+    <div id="memory-phase">
+        <h4>Запомните эти слова!</h4>
+        <div id="words-display" class="words-container">
+            {% for word in task_data.memory_words %}
+            <span class="memory-word">{{ word }}</span>
+            {% endfor %}
+        </div>
+        <p class="text-muted mt-3">У вас есть {{ max_time }} секунд...</p>
+        <div id="timer" class="display-4">{{ max_time }}</div>
+    </div>
+    
+    <div id="test-phase" style="display: none;">
+        <h4>Выберите слова, которые вы запомнили</h4>
+        <p class="text-muted">Нажимайте на слова, которые были в списке. Выберите {{ task_data.words_count }} слов.</p>
+        <div id="choices-container" class="words-container">
+            {% for word in task_data.all_choices %}
+            <div class="word-card" data-word="{{ word }}">{{ word }}</div>
+            {% endfor %}
+        </div>
+        <div class="mt-3">
+            <button type="button" class="btn btn-success" id="check-btn">Проверить</button>
+            <a href="{% url 'exercise_play' exercise.slug %}" class="btn btn-warning">Начать заново</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const wordsCount = {{ task_data.words_count }};
+    const memoryWords = {{ task_data.memory_words|safe }};
+    const maxTime = {{ max_time }};
+    
+    let timeLeft = maxTime;
+    let timerInterval;
+    let selectedWords = [];
+    
+    function startTimer() {
+        const timerDisplay = document.getElementById('timer');
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerDisplay.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                showTestPhase();
+            }
+        }, 1000);
+    }
+    
+    function showTestPhase() {
+        clearInterval(timerInterval);
+        document.getElementById('memory-phase').style.display = 'none';
+        document.getElementById('test-phase').style.display = 'block';
+    }
+    
+    function updateSelectedCount() {
+        document.getElementById('selected-count').textContent = selectedWords.length;
+    }
+    
+    // Обработчики для выбора слов
+    const wordCards = document.querySelectorAll('#choices-container .word-card');
+    wordCards.forEach(card => {
+        card.addEventListener('click', () => {
+            const word = card.dataset.word;
+            const index = selectedWords.indexOf(word);
+            
+            if (index === -1) {
+                if (selectedWords.length < wordsCount) {
+                    selectedWords.push(word);
+                    card.classList.add('selected');
+                } else {
+                    alert(`Нужно выбрать ровно ${wordsCount} слов!`);
+                }
+            } else {
+                selectedWords.splice(index, 1);
+                card.classList.remove('selected');
+            }
+            updateSelectedCount();
+        });
+    });
+    
+    document.getElementById('check-btn').addEventListener('click', () => {
+        if (selectedWords.length !== wordsCount) {
+            alert(`Выберите ровно ${wordsCount} слов!`);
+            return;
+        }
+        
+        const answerInput = document.getElementById('answer-input');
+        answerInput.value = JSON.stringify(selectedWords);
+        document.getElementById('submit-btn').click();
+    });
+    
+    startTimer();
+</script>
+{% endblock %}
