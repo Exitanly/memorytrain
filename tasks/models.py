@@ -128,18 +128,25 @@ class ExerciseSession(models.Model):
 
 
 class GeneratedTextCache(models.Model):
-    """Кэш для текстов с вопросами (чтобы не генерировать каждый раз)"""
+    """Кэш сгенерированных текстов с вопросами"""
+    
+    DIFFICULTY_CHOICES = [
+        (1, 'Лёгкий'),
+        (2, 'Средний'),
+        (3, 'Сложный'),
+    ]
     
     text = models.TextField(verbose_name='Текст')
-    questions = models.JSONField(verbose_name='Вопросы и ответы')  # [{"question": "...", "answer": "..."}]
-    difficulty = models.IntegerField(verbose_name='Сложность')
+    questions = models.JSONField(verbose_name='Вопросы и ответы')
+    difficulty = models.IntegerField(choices=DIFFICULTY_CHOICES, verbose_name='Сложность')
     
     used_count = models.IntegerField(default=0, verbose_name='Сколько раз использован')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    last_used = models.DateTimeField(auto_now=True, verbose_name='Последнее использование')
     
     class Meta:
         verbose_name = 'Кэш текста с вопросами'
         verbose_name_plural = 'Кэш текстов с вопросами'
     
     def __str__(self):
-        return f"Текст {self.difficulty} уровня (использован: {self.used_count})"
+        return f"Текст {self.get_difficulty_display()} уровня (использован: {self.used_count})"

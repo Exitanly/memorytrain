@@ -6,6 +6,7 @@ from .number_position import NumberPositionGenerator
 from .word_recall import WordRecallGenerator
 from .color_grid import ColorGridGenerator
 from .odd_word import OddWordGenerator
+from .text_qa import TextQAGenerator
 
 GENERATORS = {
     'PatternGridGenerator': PatternGridGenerator,
@@ -15,5 +16,6 @@ GENERATORS = {
     'NumberPositionGenerator': NumberPositionGenerator,
     'WordRecallGenerator': WordRecallGenerator,
     'ColorGridGenerator': ColorGridGenerator,
-    'OddWordGenerator': OddWordGenerator
+    'OddWordGenerator': OddWordGenerator,
+    'TextQAGenerator': TextQAGenerator,
 }

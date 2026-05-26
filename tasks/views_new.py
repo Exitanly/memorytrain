@@ -29,6 +29,9 @@ def exercise_play(request, slug):
     """Страница выполнения упражнения"""
     exercise_type = get_object_or_404(ExerciseType, slug=slug, is_active=True)
     
+    # Проверяем параметр next (следующий текст) - только для text-questions
+    force_new = request.GET.get('next') == '1'
+    
     # Определяем сложность на основе уровня пользователя
     if request.user.level <= 3:
         difficulty = 1
@@ -43,9 +46,14 @@ def exercise_play(request, slug):
         messages.error(request, 'Упражнение временно недоступно')
         return redirect('exercise_list')
     
-    # Генерируем задание
+    # Создаём генератор и генерируем задание
     generator = generator_class(difficulty)
-    task = generator.generate()
+    
+    # Только для text-questions передаём force_new
+    if slug == 'text-questions':
+        task = generator.generate(force_new=force_new)
+    else:
+        task = generator.generate()
     
     # Сохраняем данные проверки в сессию
     request.session['current_exercise'] = {
@@ -54,6 +62,7 @@ def exercise_play(request, slug):
         'difficulty': difficulty,
         'check_data': task['check_data'],
         'max_time': task['max_time'],
+        'text_id': task['task_data'].get('text_id'),
     }
     
     context = {
@@ -78,7 +87,6 @@ def exercise_check(request, slug):
     print(f"\n=== DEBUG: Проверка упражнения {slug} ===")
     
     if request.method != 'POST':
-        print("DEBUG: Не POST запрос")
         return redirect('exercise_list')
     
     exercise_type = get_object_or_404(ExerciseType, slug=slug)
@@ -92,7 +100,6 @@ def exercise_check(request, slug):
     
     user_answer = request.POST.get('answer')
     print(f"DEBUG: Получен ответ (raw): {user_answer}")
-    print(f"DEBUG: Тип ответа: {type(user_answer)}")
     
     if not user_answer:
         messages.error(request, 'Пожалуйста, дайте ответ')
@@ -101,7 +108,7 @@ def exercise_check(request, slug):
     # Парсим ответ
     parsed_answer = user_answer
     try:
-        if user_answer.startswith('{'):
+        if user_answer.startswith('{') or user_answer.startswith('['):
             parsed_answer = json.loads(user_answer)
             print(f"DEBUG: Распарсили в JSON: {parsed_answer}")
     except Exception as e:
@@ -118,6 +125,10 @@ def exercise_check(request, slug):
     print(f"DEBUG: is_correct = {is_correct}")
     print(f"DEBUG: message = {message}")
     
+    # Получаем детали проверки (для text-questions)
+    check_results = getattr(generator, 'check_results', {})
+    text_id = session_data.get('text_id')
+    
     # Рассчитываем очки
     score = generator.calculate_score(is_correct, 10, 1) if is_correct else 0
     print(f"DEBUG: score = {score}")
@@ -133,8 +144,15 @@ def exercise_check(request, slug):
             'is_correct': is_correct,
             'score': score,
             'user_answer': str(user_answer),
+            'results': check_results.get('results', []),
         }
     )
+    
+    # Если ответ правильный - удаляем текст из кэша (только для text-questions)
+    if is_correct and text_id and slug == 'text-questions':
+        from .services.text_generator import generator as text_gen
+        text_gen.mark_as_used(text_id)
+        print(f"DEBUG: Текст {text_id} удалён из кэша")
     
     # Начисляем опыт
     if score > 0:
@@ -153,4 +171,10 @@ def exercise_check(request, slug):
     
     print("=== DEBUG: Конец проверки ===\n")
     
-    return redirect('exercise_play', slug=slug)
+    # Перенаправляем обратно на то же упражнение с параметром результата
+    if slug == 'text-questions':
+        # Для text-questions показываем модальное окно
+        return redirect(f'/tasks/exercises/{slug}/?result={"success" if is_correct else "fail"}')
+    else:
+        # Для остальных упражнений просто возвращаемся к новому заданию
+        return redirect(f'/tasks/exercises/{slug}/')
