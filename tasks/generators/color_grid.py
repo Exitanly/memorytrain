@@ -31,7 +31,8 @@ class ColorGridGenerator(BaseTaskGenerator):
             ]
         
         # Создаём сетку цветов (перемешиваем)
-        grid_colors = random.sample(colors, grid_size * grid_size)
+        total_cells = grid_size * grid_size
+        grid_colors = random.sample(colors, total_cells)
         
         # Создаём матрицу цветов для отображения
         color_matrix = []
@@ -41,9 +42,9 @@ class ColorGridGenerator(BaseTaskGenerator):
                 row.append(grid_colors[i * grid_size + j])
             color_matrix.append(row)
         
-        # Время на запоминание (2 секунды на клетку)
-        max_time = (grid_size * grid_size) * 1.5
-        self.max_time = int(max_time)
+        # Время на запоминание (1.5 секунды на клетку)
+        max_time = int(total_cells * 1.5)
+        self.max_time = max_time
         
         return {
             'task_data': {
@@ -54,9 +55,9 @@ class ColorGridGenerator(BaseTaskGenerator):
             'check_data': {
                 'grid_size': grid_size,
                 'color_matrix': color_matrix,
-                'max_time': self.max_time,
+                'max_time': max_time,
             },
-            'max_time': self.max_time,
+            'max_time': max_time,
         }
     
     def check_answer(self, user_answer, check_data):
@@ -73,13 +74,25 @@ class ColorGridGenerator(BaseTaskGenerator):
             
             # Сравниваем клетки
             correct_count = 0
+            results = []
             for i in range(grid_size):
                 for j in range(grid_size):
                     if user_answer[i][j] == correct_matrix[i][j]:
                         correct_count += 1
+                        results.append(True)
+                    else:
+                        results.append(False)
             
             total_cells = grid_size * grid_size
             is_correct = correct_count == total_cells
+            
+            # Сохраняем детали для достижений
+            self.check_results = {
+                'is_correct': is_correct,
+                'correct_count': correct_count,
+                'total': total_cells,
+                'results': results,
+            }
             
             if is_correct:
                 return True, f"Правильно! Вы раскрасили все {total_cells} клеток правильно!"
@@ -88,6 +101,12 @@ class ColorGridGenerator(BaseTaskGenerator):
                 
         except Exception as e:
             print(f"Ошибка проверки: {e}")
+            self.check_results = {
+                'is_correct': False,
+                'correct_count': 0,
+                'total': 0,
+                'results': [],
+            }
             return False, "Ошибка проверки ответа"
     
     def calculate_score(self, is_correct, time_spent, attempts=1):
@@ -97,6 +116,7 @@ class ColorGridGenerator(BaseTaskGenerator):
         base_points = {1: 15, 2: 20, 3: 30}[self.difficulty]
         max_time = getattr(self, 'max_time', 30)
         
+        # Бонус за скорость
         if time_spent < max_time * 0.5:
             bonus = 1.2
         elif time_spent < max_time * 0.7:

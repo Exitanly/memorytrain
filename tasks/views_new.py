@@ -6,7 +6,7 @@ from django.template.exceptions import TemplateDoesNotExist
 from .models import ExerciseType, ExerciseSession, GeneratedTextCache
 from .generators import GENERATORS
 import json
-from .achievements import AchievementChecker
+
 @login_required
 def exercise_list(request):
     """Страница со списком категорий и упражнений"""
@@ -48,7 +48,7 @@ def exercise_list(request):
         'can_hard': request.user.can_access_difficulty(3),
     }
     
-    return render(request, 'tasks_new/exercise_list.html', context)
+    return render(request, 'tasks_new/exercise_list.html', {'categories': categories})
 
 
 @login_required
@@ -215,8 +215,17 @@ def exercise_check(request, slug):
     print(f"DEBUG: is_correct = {is_correct}")
     print(f"DEBUG: message = {message}")
     
-    # Получаем детали проверки (для text-questions)
+    # Получаем детали проверки (для всех заданий)
     check_results = getattr(generator, 'check_results', {})
+    if not check_results:
+        # Если генератор не вернул check_results, создаём базовый
+        check_results = {
+            'is_correct': is_correct,
+            'correct_count': 1 if is_correct else 0,
+            'total': 1,
+            'results': [is_correct],
+        }
+    
     text_id = session_data.get('text_id')
     
     # Рассчитываем очки
@@ -238,10 +247,9 @@ def exercise_check(request, slug):
         }
     )
     
-    # Если ответ правильный - помечаем текст на удаление (но не удаляем сейчас)
+    # Если ответ правильный - помечаем текст на удаление (только для text-questions)
     if is_correct and text_id and slug == 'text-questions':
         request.session['text_to_delete'] = text_id
-        # НЕ удаляем saved_text_id из сессии, чтобы текст не генерировался заново при редиректе
         print(f"DEBUG: Текст {text_id} помечен на удаление")
     
     # Начисляем опыт
@@ -252,10 +260,22 @@ def exercise_check(request, slug):
             messages.success(request, f'Поздравляем! Вы получили {score} очков и повысили уровень до {request.user.level}!')
         else:
             messages.success(request, f'Отлично! Вы получили {score} очков!')
-        #  Проверяем достижения
+        
+        # Определяем, выполнено ли задание идеально (без ошибок)
         is_perfect = False
-        if check_results.get('total', 0) > 0:
-            is_perfect = check_results.get('correct_count', 0) == check_results.get('total', 0)
+        if slug in ['color-grid', 'pattern-grid', 'number-position']:
+            # Для этих заданий используем is_correct напрямую
+            is_perfect = is_correct
+        else:
+            # Для остальных заданий используем подсчёт правильных ответов
+            total_questions = check_results.get('total', 1)
+            correct_count = check_results.get('correct_count', 1 if is_correct else 0)
+            is_perfect = correct_count == total_questions and total_questions > 0
+        
+        print(f"DEBUG: perfect check - slug={slug}, is_correct={is_correct}, is_perfect={is_perfect}")
+        
+        # Проверяем достижения
+        from .achievements import AchievementChecker
         
         event_data = {
             'slug': slug,
@@ -277,4 +297,7 @@ def exercise_check(request, slug):
     print("=== DEBUG: Конец проверки ===\n")
     
     # Перенаправляем обратно на то же упражнение с параметром результата
-    return redirect(f'/tasks/exercises/{slug}/?result={"success" if is_correct else "fail"}')
+    if slug == 'text-questions':
+        return redirect(f'/tasks/exercises/{slug}/?result={"success" if is_correct else "fail"}')
+    else:
+        return redirect(f'/tasks/exercises/{slug}/')
