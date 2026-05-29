@@ -13,8 +13,10 @@ class TaskCategory(models.Model):
     def __str__(self):
         return self.name
 
+
 class Task(models.Model):
-    """Модель задания"""
+    """Модель задания (старая, для обратной совместимости)"""
+    
     DIFFICULTY_CHOICES = [
         (1, 'Лёгкий'),
         (2, 'Средний'),
@@ -51,8 +53,9 @@ class Task(models.Model):
         """Возвращает очки в зависимости от сложности"""
         return self.base_points * self.difficulty
 
+
 class UserProgress(models.Model):
-    """Прогресс пользователя по заданиям"""
+    """Прогресс пользователя по заданиям (старый)"""
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, verbose_name='Пользователь')
     task = models.ForeignKey(Task, on_delete=models.CASCADE, verbose_name='Задание')
     completed = models.BooleanField(default=False, verbose_name='Выполнено')
@@ -63,13 +66,13 @@ class UserProgress(models.Model):
     class Meta:
         verbose_name = 'Прогресс пользователя'
         verbose_name_plural = 'Прогресс пользователей'
-        unique_together = ['user', 'task']  # Пользователь не может выполнить задание дважды
+        unique_together = ['user', 'task']
     
     def __str__(self):
         return f"{self.user.username} - {self.task.title}"
-    
 
-# ========== НОВЫЕ МОДЕЛИ ДЛЯ НОВОЙ АРХИТЕКТУРЫ ==========
+
+# ========== НОВАЯ АРХИТЕКТУРА ==========
 
 class ExerciseType(models.Model):
     """Тип упражнения (например, 'Карточки', 'Слепое действие')"""
@@ -150,3 +153,53 @@ class GeneratedTextCache(models.Model):
     
     def __str__(self):
         return f"Текст {self.get_difficulty_display()} уровня (использован: {self.used_count})"
+
+
+# ========== СИСТЕМА ДОСТИЖЕНИЙ ==========
+
+class Achievement(models.Model):
+    """Модель достижения"""
+    
+    CONDITION_TYPES = [
+        ('tasks_completed', 'Выполнено заданий'),
+        ('perfect_tasks', 'Заданий без ошибок'),
+        ('level_reached', 'Достигнут уровень'),
+        ('points_total', 'Всего очков опыта'),
+        ('specific_task_perfect', 'Конкретное задание без ошибок'),
+        ('hard_difficulty_task', 'Задание на высокой сложности'),
+        ('specific_task_hard', 'Конкретное задание на высокой сложности'),
+    ]
+    
+    name = models.CharField(max_length=100, verbose_name='Название')
+    description = models.TextField(verbose_name='Описание')
+    icon = models.CharField(max_length=50, default='bi-trophy-fill', verbose_name='Иконка')
+    condition_type = models.CharField(max_length=50, choices=CONDITION_TYPES, verbose_name='Тип условия')
+    condition_value = models.IntegerField(verbose_name='Значение условия')
+    condition_extra = models.CharField(max_length=100, blank=True, null=True, verbose_name='Дополнительный параметр')
+    reward_points = models.IntegerField(default=0, verbose_name='Награда (опыт)')
+    order = models.IntegerField(default=0, verbose_name='Порядок')
+    is_active = models.BooleanField(default=True, verbose_name='Активно')
+    
+    class Meta:
+        verbose_name = 'Достижение'
+        verbose_name_plural = 'Достижения'
+        ordering = ['order']
+    
+    def __str__(self):
+        return self.name
+
+
+class UserAchievement(models.Model):
+    """Выполненные достижения пользователя"""
+    
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='user_achievements')
+    achievement = models.ForeignKey(Achievement, on_delete=models.CASCADE)
+    earned_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата получения')
+    
+    class Meta:
+        verbose_name = 'Достижение пользователя'
+        verbose_name_plural = 'Достижения пользователей'
+        unique_together = ['user', 'achievement']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.achievement.name}"

@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Мои достижения{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">🏆 Мои достижения</h1>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-3 text-center">
+                    <h2>{{ earned_count }}/{{ total_count }}</h2>
+                    <p class="text-muted">достижений получено</p>
+                </div>
+                <div class="col-md-9">
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar bg-success" style="width: {{ progress }}%;">
+                            {{ progress }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        {% for ach in achievements %}
+        <div class="col-md-4 mb-3">
+            <div class="card h-100 {% if ach.earned %}border-success{% else %}opacity-50{% endif %}">
+                <div class="card-body text-center">
+                    <i class="bi {{ ach.icon }} fs-1 {% if ach.earned %}text-success{% else %}text-secondary{% endif %}"></i>
+                    <h5 class="card-title mt-2">{{ ach.name }}</h5>
+                    <p class="card-text small">{{ ach.description }}</p>
+                    {% if ach.earned %}
+                        <span class="badge bg-success">
+                            <i class="bi bi-check-circle"></i> Получено
+                        </span>
+                        <small class="d-block text-muted mt-1">
+                            {{ ach.earned_at|date:"d.m.Y" }}
+                        </small>
+                    {% else %}
+                        <span class="badge bg-secondary">
+                            <i class="bi bi-lock"></i> Не получено
+                        </span>
+                    {% endif %}
+                    <div class="mt-2">
+                        <small class="text-warning">
+                            <i class="bi bi-star-fill"></i> +{{ ach.reward_points }} опыта
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="text-center mt-4">
+        <a href="{% url 'exercise_list' %}" class="btn btn-primary">Продолжить тренировки</a>
+    </div>
+</div>
+{% endblock %}

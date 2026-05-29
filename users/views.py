@@ -8,6 +8,7 @@ from django.utils.encoding import force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth import get_user_model
 from .models import User
+from tasks.achievements import get_user_achievements, get_achievement_stats
 
 User = get_user_model()
 
@@ -83,4 +84,17 @@ def custom_password_reset_confirm(request, uidb64, token):
     return render(request, 'users/password_reset_confirm.html', {
         'form': form,
         'validlink': validlink,
+    })
+
+
+def achievements(request):
+    """Страница достижений пользователя"""
+    achievements_list = get_user_achievements(request.user)
+    stats = get_achievement_stats(request.user)
+    
+    return render(request, 'users/achievements.html', {
+        'achievements': achievements_list,
+        'earned_count': stats['earned'],
+        'total_count': stats['total'],
+        'progress': stats['progress'],
     })

@@ -11,4 +11,5 @@ urlpatterns = [
     
     # Кастомный сброс пароля
     path('reset/<uidb64>/<token>/', views.custom_password_reset_confirm, name='password_reset_confirm'),
+    path('achievements/', views.achievements, name='achievements'),
 ]

@@ -6,7 +6,7 @@ from django.template.exceptions import TemplateDoesNotExist
 from .models import ExerciseType, ExerciseSession, GeneratedTextCache
 from .generators import GENERATORS
 import json
-
+from .achievements import AchievementChecker
 @login_required
 def exercise_list(request):
     """Страница со списком категорий и упражнений"""
@@ -252,6 +252,21 @@ def exercise_check(request, slug):
             messages.success(request, f'Поздравляем! Вы получили {score} очков и повысили уровень до {request.user.level}!')
         else:
             messages.success(request, f'Отлично! Вы получили {score} очков!')
+        #  Проверяем достижения
+        is_perfect = False
+        if check_results.get('total', 0) > 0:
+            is_perfect = check_results.get('correct_count', 0) == check_results.get('total', 0)
+        
+        event_data = {
+            'slug': slug,
+            'difficulty': session_data['difficulty'],
+            'perfect': is_perfect,
+            'score': score,
+        }
+        earned = AchievementChecker.check_all_achievements(request.user, 'task_completed', event_data)
+        
+        for ach in earned:
+            messages.success(request, f'🏆 Получено достижение: {ach.name}! +{ach.reward_points} очков')
     else:
         messages.warning(request, message)
     
