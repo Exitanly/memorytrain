@@ -4,10 +4,11 @@ from django.contrib.auth.decorators import login_required
 def home(request):
     context = {}
     if request.user.is_authenticated:
-        required_exp = request.user.level * 100
-        progress_percent = (request.user.experience / required_exp) * 100 if required_exp > 0 else 0
-        context['progress_percent'] = progress_percent
+        # Рассчитываем прогресс до следующего уровня
+        context['progress_percent'] = request.user.get_exp_progress()
+        context['exp_display'] = request.user.get_exp_current_display()
     return render(request, 'main/home.html', context)
+
 
 @login_required
 def rating(request):

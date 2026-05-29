@@ -8,5 +8,6 @@ class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ('Game Stats', {'fields': ('level', 'experience', 'total_points')}),
     )
+    readonly_fields = ('level', 'experience', 'total_points')
 
 admin.site.register(User, CustomUserAdmin)

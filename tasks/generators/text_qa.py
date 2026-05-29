@@ -2,18 +2,24 @@ from .base import BaseTaskGenerator
 from ..services.text_generator import generator as text_generator
 
 class TextQAGenerator(BaseTaskGenerator):
-    """Генератор для вопросов по тексту"""
+    """Генератор для вопросов по тексту (гибридный)"""
     
-    def generate(self, force_new=False):
-        # force_new - принудительная генерация нового текста
+    def generate(self, force_new=False, skip_generation=False):
+        """
+        force_new: принудительно генерировать новый текст
+        skip_generation: не генерировать новый текст (использовать сохранённый)
+        """
+        if skip_generation and hasattr(self, '_cached_task'):
+            return self._cached_task
+        
         text_data = text_generator.get_text(self.difficulty, force_new=force_new)
         
-        return {
+        task = {
             'task_data': {
                 'text': text_data['text'],
                 'questions': text_data['questions'],
                 'total_questions': len(text_data['questions']),
-                'text_id': text_data.get('id'),  # ID текста в кэше
+                'text_id': text_data.get('id'),
             },
             'check_data': {
                 'questions': text_data['questions'],
@@ -21,6 +27,14 @@ class TextQAGenerator(BaseTaskGenerator):
             },
             'max_time': 0,
         }
+        
+        # Кэшируем задание
+        self._cached_task = task
+        return task
+    
+    def get_cached_task(self):
+        """Возвращает кэшированное задание"""
+        return getattr(self, '_cached_task', None)
     
     def check_answer(self, user_answer, check_data):
         try:
@@ -32,10 +46,12 @@ class TextQAGenerator(BaseTaskGenerator):
             
             correct_count = 0
             results = []
+            user_answers = []
             
             for i, (q, user_ans) in enumerate(zip(questions, user_answer)):
                 correct_answer = q['answer'].lower().strip()
                 user_response = str(user_ans).lower().strip()
+                user_answers.append(user_response)
                 
                 if correct_answer in user_response or user_response in correct_answer:
                     correct_count += 1
@@ -52,6 +68,7 @@ class TextQAGenerator(BaseTaskGenerator):
                 'correct_count': correct_count,
                 'total': total,
                 'results': results,
+                'user_answers': user_answers,
                 'text_id': check_data.get('text_id'),
             }
             

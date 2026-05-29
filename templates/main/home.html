@@ -37,11 +37,14 @@
                 <div class="col-md-4">
                     <div class="card">
                         <div class="card-body">
-                            <h5 class="card-title">Прогресс</h5>
-                            <div class="progress">
+                            <h5 class="card-title">Прогресс до уровня {{ user.level|add:"1" }}</h5>
+                            <div class="progress mb-2">
                                 <div class="progress-bar" style="width: {{ progress_percent }}%"></div>
                             </div>
-                            <small>{{ user.experience }}/{{ user.level|add:100 }} опыта</small>
+                            <small>{{ exp_display }} опыта</small>
+                            <p class="mt-2 text-muted small">
+                                Следующий уровень требует {{ user.get_exp_for_next_level }} опыта
+                            </p>
                         </div>
                     </div>
                 </div>

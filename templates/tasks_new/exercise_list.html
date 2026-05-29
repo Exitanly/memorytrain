@@ -1,31 +1,104 @@
 {% extends 'base.html' %}
 
-{% block title %}Тренировки{% endblock %}
+{% block title %}Тренировки памяти{% endblock %}
+
+{% block extra_css %}
+<style>
+    .difficulty-buttons {
+        margin-bottom: 20px;
+    }
+    .difficulty-btn {
+        margin: 0 5px;
+        min-width: 120px;
+    }
+    .difficulty-btn.active {
+        transform: scale(1.02);
+        box-shadow: 0 0 15px rgba(0,123,255,0.5);
+    }
+    .difficulty-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+    .unlock-info {
+        font-size: 0.85rem;
+        margin-top: 10px;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<h1 class="mb-4">Тренировки памяти</h1>
-
-{% for cat_key, category in categories.items %}
-<div class="card mb-4">
-    <div class="card-header bg-primary text-white">
-        <h3 class="mb-0">{{ category.name }}</h3>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            {% for exercise in category.exercises %}
-            <div class="col-md-4 mb-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <i class="bi {{ exercise.icon }} fs-1"></i>
-                        <h5 class="card-title mt-2">{{ exercise.name }}</h5>
-                        <p class="card-text small">{{ exercise.description|truncatewords:15 }}</p>
-                        <a href="{% url 'exercise_play' exercise.slug %}" class="btn btn-primary">Начать</a>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
+<div class="container">
+    <h1 class="mb-4">Тренировки памяти</h1>
+    
+    <!-- Кнопки выбора сложности -->
+    <div class="difficulty-buttons text-center">
+        <div class="btn-group" role="group">
+            <!-- Лёгкая всегда доступна -->
+            <a href="?difficulty=1" class="btn btn-outline-success difficulty-btn {% if current_difficulty == 1 %}active{% endif %}">
+                🌿 Лёгкая
+            </a>
+            
+            <!-- Средняя -->
+            {% if can_medium %}
+                <a href="?difficulty=2" class="btn btn-outline-warning difficulty-btn {% if current_difficulty == 2 %}active{% endif %}">
+                    ⚡ Средняя
+                </a>
+            {% else %}
+                <span class="btn btn-outline-warning difficulty-btn disabled">
+                    ⚡ Средняя <small>(5 уровень)</small>
+                </span>
+            {% endif %}
+            
+            <!-- Сложная -->
+            {% if can_hard %}
+                <a href="?difficulty=3" class="btn btn-outline-danger difficulty-btn {% if current_difficulty == 3 %}active{% endif %}">
+                    🔥 Сложная
+                </a>
+            {% else %}
+                <span class="btn btn-outline-danger difficulty-btn disabled">
+                    🔥 Сложная <small>(10 уровень)</small>
+                </span>
+            {% endif %}
+        </div>
+        <div class="unlock-info">
+            {% if current_difficulty == 1 %}
+                <i class="bi bi-info-circle"></i> Лёгкая сложность доступна всем
+            {% elif current_difficulty == 2 %}
+                <i class="bi bi-star"></i> Средняя сложность открыта с 5 уровня
+            {% elif current_difficulty == 3 %}
+                <i class="bi bi-trophy"></i> Сложная сложность открыта с 10 уровня
+            {% endif %}
         </div>
     </div>
+    
+    <!-- Список упражнений по категориям -->
+    {% for cat_key, category in categories.items %}
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0">{{ category.name }}</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for exercise in category.exercises %}
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="bi {{ exercise.icon }} fs-1"></i>
+                            <h5 class="card-title mt-2">{{ exercise.name }}</h5>
+                            <p class="card-text small">{{ exercise.description|truncatewords:15 }}</p>
+                            <a href="{% url 'exercise_play' exercise.slug %}?difficulty={{ current_difficulty }}" 
+                               class="btn btn-primary">
+                                Начать
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
 </div>
-{% endfor %}
 {% endblock %}
