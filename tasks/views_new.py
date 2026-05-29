@@ -14,7 +14,6 @@ def exercise_list(request):
     selected_difficulty = request.GET.get('difficulty')
     if selected_difficulty:
         selected_difficulty = int(selected_difficulty)
-        # Проверяем, может ли пользователь выбрать эту сложность
         if request.user.can_access_difficulty(selected_difficulty):
             request.session['selected_difficulty'] = selected_difficulty
         else:
@@ -23,12 +22,10 @@ def exercise_list(request):
     else:
         selected_difficulty = request.session.get('selected_difficulty', 1)
     
-    # Убеждаемся, что выбранная сложность доступна
     if not request.user.can_access_difficulty(selected_difficulty):
         selected_difficulty = 1
         request.session['selected_difficulty'] = 1
     
-    # Получаем упражнения
     exercises = ExerciseType.objects.filter(is_active=True).order_by('category', 'order')
     
     categories = {
@@ -40,7 +37,6 @@ def exercise_list(request):
     for ex in exercises:
         categories[ex.category]['exercises'].append(ex)
     
-    # Подготавливаем данные о доступности сложностей для шаблона
     context = {
         'categories': categories,
         'current_difficulty': selected_difficulty,
@@ -48,7 +44,7 @@ def exercise_list(request):
         'can_hard': request.user.can_access_difficulty(3),
     }
     
-    return render(request, 'tasks_new/exercise_list.html', {'categories': categories})
+    return render(request, 'tasks_new/exercise_list.html', context)
 
 
 @login_required
@@ -56,33 +52,25 @@ def exercise_play(request, slug):
     """Страница выполнения упражнения"""
     exercise_type = get_object_or_404(ExerciseType, slug=slug, is_active=True)
     
-    # Получаем выбранную сложность (из GET или сессии)
     url_difficulty = request.GET.get('difficulty')
     if url_difficulty:
         difficulty = int(url_difficulty)
     else:
         difficulty = request.session.get('selected_difficulty', 1)
     
-    # Проверяем, может ли пользователь играть на этой сложности
     if not request.user.can_access_difficulty(difficulty):
         messages.error(request, f'Эта сложность недоступна до {5 if difficulty == 2 else 10} уровня!')
         difficulty = 1
     
-    # Получаем класс генератора
     generator_class = GENERATORS.get(exercise_type.generator_class)
     if not generator_class:
         messages.error(request, 'Упражнение временно недоступно')
         return redirect('exercise_list')
     
-    # Для text-questions используем отдельную логику с сохранением текста
     if slug == 'text-questions':
-        # Проверяем, есть ли текст на удаление (приходим сюда после правильных ответов)
         text_to_delete = request.session.pop('text_to_delete', None)
-        
-        # Проверяем, нужно ли сгенерировать новый текст
         generate_new = request.GET.get('new') == '1'
         
-        # Если generate_new=True - удаляем старый текст и генерируем новый
         if generate_new and text_to_delete:
             try:
                 from .services.text_generator import generator as text_gen
@@ -92,13 +80,10 @@ def exercise_play(request, slug):
             except Exception as e:
                 print(f"DEBUG: Ошибка удаления текста: {e}")
         
-        # Проверяем, есть ли сохранённый текст в сессии
         saved_text_id = request.session.get('saved_text_id')
-        
         task = None
         
         if not generate_new and saved_text_id:
-            # Пытаемся восстановить текст из кэша
             try:
                 cached_text = GeneratedTextCache.objects.filter(id=saved_text_id).first()
                 if cached_text:
@@ -119,14 +104,12 @@ def exercise_play(request, slug):
                 print(f"Ошибка восстановления текста: {e}")
         
         if not task:
-            # Генерируем новый текст
             generator = generator_class(difficulty)
             task = generator.generate(force_new=generate_new)
             text_id = task['task_data'].get('text_id')
             if text_id:
                 request.session['saved_text_id'] = text_id
         
-        # Сохраняем данные проверки в сессию
         request.session['current_exercise'] = {
             'slug': slug,
             'generator_class': exercise_type.generator_class,
@@ -144,7 +127,6 @@ def exercise_play(request, slug):
         }
         
     else:
-        # Для остальных упражнений - обычная логика
         generator = generator_class(difficulty)
         task = generator.generate()
         
@@ -195,7 +177,6 @@ def exercise_check(request, slug):
         messages.error(request, 'Пожалуйста, дайте ответ')
         return redirect('exercise_play', slug=slug)
     
-    # Парсим ответ
     parsed_answer = user_answer
     try:
         if user_answer.startswith('{') or user_answer.startswith('['):
@@ -204,21 +185,17 @@ def exercise_check(request, slug):
     except Exception as e:
         print(f"DEBUG: Ошибка парсинга JSON: {e}")
     
-    # Получаем генератор
     generator_class = GENERATORS.get(session_data['generator_class'])
     print(f"DEBUG: generator_class = {generator_class}")
     
     generator = generator_class(session_data['difficulty'])
     
-    # Проверяем ответ
     is_correct, message = generator.check_answer(parsed_answer, session_data['check_data'])
     print(f"DEBUG: is_correct = {is_correct}")
     print(f"DEBUG: message = {message}")
     
-    # Получаем детали проверки (для всех заданий)
     check_results = getattr(generator, 'check_results', {})
     if not check_results:
-        # Если генератор не вернул check_results, создаём базовый
         check_results = {
             'is_correct': is_correct,
             'correct_count': 1 if is_correct else 0,
@@ -228,11 +205,9 @@ def exercise_check(request, slug):
     
     text_id = session_data.get('text_id')
     
-    # Рассчитываем очки
     score = generator.calculate_score(is_correct, 10, 1) if is_correct else 0
     print(f"DEBUG: score = {score}")
     
-    # Сохраняем сессию выполнения
     ExerciseSession.objects.create(
         user=request.user,
         exercise_type=exercise_type,
@@ -247,12 +222,10 @@ def exercise_check(request, slug):
         }
     )
     
-    # Если ответ правильный - помечаем текст на удаление (только для text-questions)
     if is_correct and text_id and slug == 'text-questions':
         request.session['text_to_delete'] = text_id
         print(f"DEBUG: Текст {text_id} помечен на удаление")
     
-    # Начисляем опыт
     if score > 0:
         level_up = request.user.add_experience(score)
         request.user.save()
@@ -261,20 +234,16 @@ def exercise_check(request, slug):
         else:
             messages.success(request, f'Отлично! Вы получили {score} очков!')
         
-        # Определяем, выполнено ли задание идеально (без ошибок)
         is_perfect = False
         if slug in ['color-grid', 'pattern-grid', 'number-position']:
-            # Для этих заданий используем is_correct напрямую
             is_perfect = is_correct
         else:
-            # Для остальных заданий используем подсчёт правильных ответов
             total_questions = check_results.get('total', 1)
             correct_count = check_results.get('correct_count', 1 if is_correct else 0)
             is_perfect = correct_count == total_questions and total_questions > 0
         
         print(f"DEBUG: perfect check - slug={slug}, is_correct={is_correct}, is_perfect={is_perfect}")
         
-        # Проверяем достижения
         from .achievements import AchievementChecker
         
         event_data = {
@@ -290,13 +259,11 @@ def exercise_check(request, slug):
     else:
         messages.warning(request, message)
     
-    # Очищаем сессию current_exercise
     if 'current_exercise' in request.session:
         del request.session['current_exercise']
     
     print("=== DEBUG: Конец проверки ===\n")
     
-    # Перенаправляем обратно на то же упражнение с параметром результата
     if slug == 'text-questions':
         return redirect(f'/tasks/exercises/{slug}/?result={"success" if is_correct else "fail"}')
     else:

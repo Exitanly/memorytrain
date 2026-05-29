@@ -88,15 +88,13 @@ class User(AbstractUser):
         self.save()
         return level_up
     
+    
     def can_access_difficulty(self, difficulty):
-        """Проверяет, может ли пользователь выбрать данную сложность"""
-        
-        if difficulty == 1:  # Лёгкая
+    
+        if difficulty == 1:
             return True
-        elif difficulty == 2:  # Средняя
-            result = self.level >= 5
-            return result
-        elif difficulty == 3:  # Сложная
-            result = self.level >= 10
-            return result
+        elif difficulty == 2:
+            return self.level >= 5
+        elif difficulty == 3:
+            return self.level >= 10
         return False
