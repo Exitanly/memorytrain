@@ -1,5 +1,8 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count, Sum, Q
+from users.models import User
+from tasks.models import ExerciseSession
 
 def home(request):
     context = {}
@@ -12,6 +15,19 @@ def home(request):
 
 @login_required
 def rating(request):
-    from users.models import User
-    users = User.objects.all().order_by('-total_points')[:10]
-    return render(request, 'main/rating.html', {'users': users})
+    """Рейтинг игроков"""
+    # Получаем пользователей с количеством выполненных заданий
+    users = User.objects.annotate(
+        completed_count=Count('exercisesession', filter=Q(exercisesession__is_completed=True))
+    ).order_by('-total_points')[:10]
+    
+    user_data = []
+    for user in users:
+        user_data.append({
+            'username': user.username,
+            'level': user.level,
+            'total_points': user.total_points,
+            'completed_tasks': user.completed_count,
+        })
+    
+    return render(request, 'main/rating.html', {'users': user_data})

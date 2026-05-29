@@ -10,6 +10,17 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+# -*- coding: utf-8 -*-
+import sys
+import io
+
+# Принудительно устанавливаем UTF-8 для stdout/stderr
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+
+
+
 from pathlib import Path
 import os
 from dotenv import load_dotenv
@@ -146,3 +157,16 @@ AUTH_USER_MODEL = 'users.User'
 load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False 
+EMAIL_HOST_USER = 'abnasrulit1@gmail.com'
+EMAIL_HOST_PASSWORD = 'vuex xcbx dfyk sjnr'
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+# Безопасность паролей
+PASSWORD_RESET_TIMEOUT = 86400  # 24 часа в секундах
