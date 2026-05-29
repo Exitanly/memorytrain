@@ -27,6 +27,7 @@ class Command(BaseCommand):
         visual_cat = TaskCategory.objects.get(name='Визуальная память')
         text_cat = TaskCategory.objects.get(name='Текстовая память')
         number_cat = TaskCategory.objects.get(name='Числовая память')
+        pattern_cat = TaskCategory.objects.get(name='Паттерны')
         
         # Создаём задания
         tasks_data = [
@@ -38,7 +39,7 @@ class Command(BaseCommand):
                 'task_type': 'visual',
                 'difficulty': 1,
                 'base_points': 10,
-                'task_data': {'colors': ['red', 'blue', 'green', 'yellow', 'purple', 'orange'], 'question': 'Какой цвет был показан?'}
+                'task_data': {'colors': ['red', 'blue', 'green', 'yellow', 'purple', 'orange']}
             },
             {
                 'title': 'Паттерн сетки',
@@ -116,11 +117,12 @@ class Command(BaseCommand):
                 'base_points': 20,
                 'task_data': {'numbers': [9, 4, 7, 2, 8, 5, 1, 6, 3, 0]}
             },
+            
             # Паттерны
             {
                 'title': 'Запомни паттерн',
                 'description': 'Запомните расположение крестиков в сетке 3x3 и повторите',
-                'category': TaskCategory.objects.get(name='Паттерны'),
+                'category': pattern_cat,
                 'task_type': 'pattern',
                 'difficulty': 1,
                 'base_points': 10,
@@ -129,7 +131,7 @@ class Command(BaseCommand):
             {
                 'title': 'Сложный паттерн',
                 'description': 'Запомните расположение крестиков в сетке 4x4',
-                'category': TaskCategory.objects.get(name='Паттерны'),
+                'category': pattern_cat,
                 'task_type': 'pattern',
                 'difficulty': 2,
                 'base_points': 15,

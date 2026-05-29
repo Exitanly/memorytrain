@@ -8,16 +8,6 @@ class Command(BaseCommand):
         exercises = [
             # Визуальная память
             {
-                'name': 'Карточки (Memo)',
-                'slug': 'memory-cards',
-                'category': 'visual',
-                'description': 'Найдите все пары одинаковых карточек. Тренирует визуальную память и внимание.',
-                'instruction': 'Переворачивайте карточки по две. Найдите все совпадающие пары.',
-                'icon': 'bi-grid-3x3-gap-fill',
-                'generator_class': 'MemoryCardsGenerator',
-                'order': 1,
-            },
-            {
                 'name': 'Паттерн на сетке',
                 'slug': 'pattern-grid',
                 'category': 'visual',
@@ -25,6 +15,16 @@ class Command(BaseCommand):
                 'instruction': 'У вас есть несколько секунд, чтобы запомнить паттерн. Затем отметьте те же клетки.',
                 'icon': 'bi-grid',
                 'generator_class': 'PatternGridGenerator',
+                'order': 1,
+            },
+            {
+                'name': 'Карточки (Memo)',
+                'slug': 'memory-cards',
+                'category': 'visual',
+                'description': 'Найдите все пары одинаковых карточек. Тренирует визуальную память и внимание.',
+                'instruction': 'Переворачивайте карточки по две. Найдите все совпадающие пары.',
+                'icon': 'bi-grid-3x3-gap-fill',
+                'generator_class': 'MemoryCardsGenerator',
                 'order': 2,
             },
             {
