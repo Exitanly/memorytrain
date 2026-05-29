@@ -67,6 +67,7 @@ class HybridTextGenerator:
     
     def __init__(self):
         self.api_key = getattr(settings, 'OPENROUTER_API_KEY', None)
+        self.use_api = True  # Можно временно отключить, если проблемы с API
     
     def get_text(self, difficulty, force_new=False):
         """Получить текст"""
@@ -75,7 +76,6 @@ class HybridTextGenerator:
         if force_new:
             result = self._generate_via_api(difficulty)
             if result:
-                # Сохраняем в кэш
                 cached = GeneratedTextCache.objects.create(
                     text=result['text'],
                     questions=result['questions'],
@@ -85,6 +85,11 @@ class HybridTextGenerator:
                 result['id'] = cached.id
                 result['source'] = 'api'
                 return result
+            else:
+                # Если API не ответил, берём статику
+                static = random.choice(self.STATIC_TEXTS.get(difficulty, self.STATIC_TEXTS[1]))
+                static['source'] = 'static (fallback)'
+                return static
         
         # Ищем неиспользованный текст в кэше
         cached = GeneratedTextCache.objects.filter(
@@ -100,7 +105,7 @@ class HybridTextGenerator:
                 'source': 'cache'
             }
         
-        # Если нет неиспользованных - генерируем новый
+        # Генерируем новый через API
         result = self._generate_via_api(difficulty)
         if result:
             cached = GeneratedTextCache.objects.create(
@@ -113,17 +118,19 @@ class HybridTextGenerator:
             result['source'] = 'api'
             return result
         
-        # Fallback на статику (если API не работает)
-        static_list = self.STATIC_TEXTS.get(difficulty, self.STATIC_TEXTS[1])
-        static = random.choice(static_list)
-        static['source'] = 'static'
-        static['id'] = None
+        # Fallback на статику
+        static = random.choice(self.STATIC_TEXTS.get(difficulty, self.STATIC_TEXTS[1]))
+        static['source'] = 'static (fallback)'
         return static
     
     def mark_as_used(self, text_id):
         """Отметить текст как использованный (удалить из кэша)"""
         if text_id:
-            GeneratedTextCache.objects.filter(id=text_id).delete()
+            try:
+                GeneratedTextCache.objects.filter(id=text_id).delete()
+                print(f"DEBUG: Текст {text_id} удалён из кэша")
+            except Exception as e:
+                print(f"DEBUG: Ошибка удаления текста: {e}")
     
     def _generate_via_api(self, difficulty):
         """Генерация через API"""
@@ -132,7 +139,7 @@ class HybridTextGenerator:
             
             prompt = f"""Создай короткий познавательный текст на русском языке {difficulty_text} уровня (5-7 предложений). Тема: любой интересный факт из истории, науки или природы.
 
-Ответь ТОЛЬКО JSON форматом, без лишнего текста:
+Ответь ТОЛЬКО JSON форматом, без лишнего текста. Убедись, что JSON валидный и содержит все кавычки:
 {{
     "text": "текст здесь",
     "questions": [
@@ -160,25 +167,66 @@ class HybridTextGenerator:
                 timeout=30
             )
             
-            if response.status_code == 200:
-                result = response.json()
-                content = result['choices'][0]['message']['content']
-                
-                content = content.strip()
-                if '```json' in content:
-                    content = content.split('```json')[1].split('```')[0]
-                elif '```' in content:
-                    content = content.split('```')[1].split('```')[0]
-                
+            if response.status_code != 200:
+                print(f"API ошибка: статус {response.status_code}")
+                return None
+            
+            result = response.json()
+            
+            # Проверяем, что ответ содержит нужные поля
+            if not result.get('choices') or len(result['choices']) == 0:
+                print("API ошибка: нет choices в ответе")
+                return None
+            
+            content = result['choices'][0].get('message', {}).get('content', '')
+            
+            if not content or not content.strip():
+                print("API ошибка: пустой content")
+                return None
+            
+            content = content.strip()
+            
+            # Очищаем ответ от маркеров кода
+            if '```json' in content:
+                parts = content.split('```json')
+                if len(parts) > 1:
+                    content = parts[1].split('```')[0]
+            elif '```' in content:
+                parts = content.split('```')
+                if len(parts) > 1:
+                    content = parts[1].split('```')[0]
+            
+            content = content.strip()
+            
+            # Проверяем, что строка начинается с { и заканчивается на }
+            if not content.startswith('{') or not content.endswith('}'):
+                print(f"API ошибка: невалидный JSON формат. Начало: {content[:100]}")
+                return None
+            
+            try:
                 parsed = json.loads(content)
-                return {
-                    'text': parsed['text'],
-                    'questions': parsed['questions'][:2]
-                }
+            except json.JSONDecodeError as e:
+                print(f"API ошибка: JSONDecodeError - {e}")
+                print(f"Проблемный контент: {content[:200]}")
+                return None
             
-            print(f"API ошибка: статус {response.status_code}")
+            # Проверяем, что есть нужные поля
+            if not parsed.get('text') or not parsed.get('questions'):
+                print("API ошибка: отсутствуют поля text или questions")
+                return None
+            
+            if len(parsed['questions']) < 2:
+                print("API ошибка: недостаточно вопросов")
+                return None
+            
+            return {
+                'text': parsed['text'],
+                'questions': parsed['questions'][:2]
+            }
+            
+        except requests.exceptions.Timeout:
+            print("API ошибка: таймаут")
             return None
-            
         except Exception as e:
             print(f"API ошибка: {e}")
             return None
